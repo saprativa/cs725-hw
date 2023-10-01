@@ -4,6 +4,149 @@ import pandas as pd
 import pickle as pkl
 
 
+
+class Priors:
+    def __init__(self):
+        
+        self.priors = {}
+        
+    def calcPriors(self, y):
+        
+        classes, counts = np.unique(y, return_counts=True)
+        
+        for c in classes:
+            self.priors[int(c)] = counts[int(c)]/y.size
+            
+    def getPriors(self):
+            
+        return self.priors
+        
+
+class GaussianDistribution:
+    def __init__(self):
+        
+        self.gaussian = {}
+        
+    def gaussianParams(self, x1, x2, y):
+        
+        for c in np.unique(y):
+            
+            values = []
+            
+            values.append(x1[np.where(y==c)[0]].mean())
+            values.append(x2[np.where(y==c)[0]].mean())
+            values.append(x1[np.where(y==c)[0]].var())
+            values.append(x2[np.where(y==c)[0]].var())
+            
+            self.gaussian[int(c)] = values
+        
+    def getParams(self):
+        return self.gaussian
+        
+        
+        
+class BernoulliDistribution:
+    def __init__(self):
+        
+        self.bernoulli = {}
+        
+    def bernoulliParams(self, x3, x4, y):
+
+        for c in np.unique(y):
+            
+            values = []
+            
+            values.append(x3[np.where(y==c)[0]].mean())
+            values.append(x4[np.where(y==c)[0]].mean())
+            
+            self.bernoulli[int(c)] = values
+        
+    def getParams(self):
+        return self.bernoulli
+    
+    
+
+class ExponentialDistribution:
+    def __init__(self):
+        
+        self.exponential = {}
+        
+    def exponentialParams(self, x7, x8, y):
+
+        for c in np.unique(y):
+            
+            values = []
+            
+            values.append(1/(x7[np.where(y==c)[0]].mean()))
+            values.append(1/(x8[np.where(y==c)[0]].mean()))
+            
+            self.exponential[int(c)] = values
+        
+    def getParams(self):
+        return self.exponential
+    
+    
+class LaplaceDistribution:
+    def __init__(self):
+        
+        self.laplace = {}
+        
+    def laplaceParams(self, x5, x6, y):
+
+        for c in np.unique(y):
+            
+            values = []
+            
+            values.append(x5[np.where(y==c)[0]].mean())
+            values.append(x6[np.where(y==c)[0]].mean())
+            values.append(np.sqrt((x5[np.where(y==c)[0]].var())/2))
+            values.append(np.sqrt((x6[np.where(y==c)[0]].var())/2))
+            
+            self.laplace[int(c)] = values
+        
+     
+    def getParams(self):
+        return self.laplace
+    
+    
+class MultinomialDistribution:
+    def __init__(self):
+        
+        self.multinomial = {}
+        self.multi_counts = {}
+        
+    def multinomialParams(self, x9, x10, y):
+
+        for c in np.unique(y):
+            
+            values = []
+            counts = []
+            
+            x9_uniques, x9_counts = np.unique(x9, return_counts=True)
+            x10_uniques, x10_counts = np.unique(x10, return_counts=True)
+            
+            values.append(x9_counts/y.shape[0])
+            values.append(x10_counts/y.shape[0])
+            
+            counts.append(x9_counts)
+            counts.append(x10_counts)
+            
+            self.multinomial[int(c)] = values
+            self.multi_counts[int(c)] = counts
+        
+    def getParams(self):
+        return (self.multinomial, self.multi_counts)
+
+
+
+p = Priors()
+g = GaussianDistribution()
+b = BernoulliDistribution()
+l = LaplaceDistribution()
+e = ExponentialDistribution()
+m = MultinomialDistribution()
+
+
 class NaiveBayes:
     def fit(self, X, y):
 
@@ -18,12 +161,12 @@ class NaiveBayes:
         You can create a separate function for fitting each distribution in its and call it here.
         """
 
-
-
-
-
-
-
+        p.calcPriors(y)
+        g.gaussianParams(X[:,0], X[:,1], y)
+        b.bernoulliParams(X[:,2], X[:,3], y)
+        l.laplaceParams(X[:,4], X[:,5], y)
+        e.exponentialParams(X[:,6], X[:,7], y)
+        m.multinomialParams(X[:,8], X[:,9], y)
 
 
         """End of your code."""
@@ -39,11 +182,58 @@ class NaiveBayes:
         It is implied that prediction[i] is the class that maximizes posterior probability for ith data point in X.
         You can create a separate function for calculating posterior probability and call it here.
         """
+        
+        predictions = []
+        
+        def posterior(x):
+            
+            probs = []
+            
+            priors = p.getPriors()
+            gaussian = g.getParams()
+            bernoulli = b.getParams()
+            laplace = l.getParams()
+            exponential = e.getParams()
+            multinomial, counts = m.getParams()
+            
+            for i in range(3):
+                
+                prob = 0
+                
+                px1_y = np.log((np.exp(-np.square(x[0]-gaussian[i][0])/(2*gaussian[i][2])))/(np.sqrt(2*(np.pi)*gaussian[i][2])))
+                px2_y = np.log((np.exp(-np.square(x[1]-gaussian[i][1])/(2*gaussian[i][3])))/(np.sqrt(2*(np.pi)*gaussian[i][3])))
 
+                px3_y = np.log((bernoulli[i][0]**x[2])*(1-bernoulli[i][0])**(1-x[2]))
+                px4_y = np.log((bernoulli[i][1]**x[3])*(1-bernoulli[i][1])**(1-x[3]))
 
+                px5_y = np.log((np.exp(-abs(x[4]-laplace[i][0])/laplace[i][2]))/(2*laplace[i][2]))
+                px6_y = np.log((np.exp(-abs(x[5]-laplace[i][1])/laplace[i][3]))/(2*laplace[i][3]))
 
-
-
+                px7_y = np.log(exponential[i][0]*np.exp(-exponential[i][0]*x[6]))
+                px8_y = np.log(exponential[i][1]*np.exp(-exponential[i][1]*x[7]))
+                
+                px9_y = 0
+                
+                for j in range(len(counts[i][0])):
+                    px9_y += counts[i][0][j]*np.log(multinomial[i][0][j])
+                    
+                px10_y = 0
+                
+                for j in range(len(counts[i][1])):
+                    px10_y += counts[i][1][j]*np.log(multinomial[i][1][j])
+                
+                prob = np.log(priors[i]) + px1_y + px2_y + px3_y + px4_y + px5_y + px6_y + px7_y + px8_y + px9_y + px10_y
+            
+                probs.append(prob)
+                
+            return probs
+        
+        for i in range(X.shape[0]):
+            
+            posteriors = posterior(X[i])
+            predictions.append(posteriors.index(max(posteriors)))
+        
+        return (np.array(predictions))
 
 
         """End of your code."""
@@ -68,11 +258,15 @@ class NaiveBayes:
         multinomial = {}
 
         """Start your code"""
-
-
-
-
         
+        priors = p.getPriors()
+        guassian = g.getParams()
+        bernoulli = b.getParams()
+        laplace = l.getParams()
+        exponential = e.getParams()
+        multinomial, _ = m.getParams()
+        
+
         """End your code"""
         return (priors, guassian, bernoulli, laplace, exponential, multinomial)        
 
@@ -138,7 +332,12 @@ def net_f1score(predictions, true_labels):
         """
         """Start of your code."""
         
-
+        
+        TP = ((predictions == label) & (true_labels == label)).sum()
+        FP = ((predictions == label) & (true_labels != label)).sum()
+        precision = TP / (TP+FP)
+        
+        return precision
 
 
         
@@ -158,7 +357,13 @@ def net_f1score(predictions, true_labels):
         """
         """Start of your code."""
         
-
+        
+        
+        TP = ((predictions == label) & (true_labels == label)).sum()
+        FN = ((predictions != label) & (true_labels == label)).sum()
+        recall = TP / (TP+FN)
+        
+        return recall
 
 
 
@@ -178,7 +383,10 @@ def net_f1score(predictions, true_labels):
 
         """Start of your code."""
         
-
+        p = precision(predictions, true_labels, label)
+        r = recall(predictions, true_labels, label)
+        
+        f1 = (2*p*r)/(p+r)
 
 
 
